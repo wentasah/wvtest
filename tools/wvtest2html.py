@@ -1,4 +1,11 @@
 #!/usr/bin/env python
+#
+# WvTest:
+#   Copyright (C) 2012 Michal Sojka <sojka@os.inf.tu-dresden.de>
+#       Licensed under the GNU Library General Public License, version 2.
+#       See the included file named LICENSE for license information.
+#
+# This script converts wvtest protocol output to HTML pages.
 
 import sys
 import re

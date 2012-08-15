@@ -1,4 +1,14 @@
 #!/usr/bin/env python
+#
+# WvTest:
+#   Copyright (C) 2012 Michal Sojka <sojka@os.inf.tu-dresden.de>
+#       Licensed under the GNU Library General Public License, version 2.
+#       See the included file named LICENSE for license information.
+#
+# This script converts a sequence of wvtest protocol outputs with
+# results of performance measurements to interactive graphs (HTML +
+# JavaScript). An example can be seen at
+# http://os.inf.tu-dresden.de/~sojka/nul/performance.html.
 
 import sys
 import re
