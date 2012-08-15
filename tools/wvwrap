@@ -38,7 +38,7 @@ while (<>)
     chomp;
     s/\r//g;
 
-    if (/^(\([0-9]+\) (#   )?)?!\s*(.*?)\s+(\S+)\s*$/) {
+    if (/^($prefix_re)?!\s*(.*?)\s+(\S+)\s*$/) {
 	my $line = $_;
 	do {
 	    print substr($line, 0, $columns) . "\n";

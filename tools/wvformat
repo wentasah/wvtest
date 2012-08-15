@@ -78,8 +78,8 @@ sub print_and_clear_log()
     my @log2print = ();
     my $skipped = 0;
     foreach (@log) {
-	if (/^(\([0-9]+\) (#   )?)?!\s*(.*?)\s+(\S+)\s*$/) {
-	    my ($prefix, $name, $result) = ($1, $3, $4);
+	if (/^($prefix_re)?!\s*(.*?)\s+(\S+)\s*$/) {
+	    my ($prefix, $name, $result) = ($1, $2, $3);
 	    push @log2print, resultline($prefix, $name, $result);
 	    if ($result ne "ok") {
 		print "wvformat: skipped $skipped lines\n" if $skipped;
@@ -120,7 +120,7 @@ while (<>)
     chomp;
     s/\r//g;
 
-    if (/^(\([0-9]+\) )?\s*Testing "(.*)" in (.*):\s*$/)
+    if (/^($prefix_re)?\s*Testing "(.*)" in (.*):\s*$/)
     {
 	print_test_summary() unless $startup;
 	$startup = 0;
@@ -130,9 +130,9 @@ while (<>)
 	    print highlight($_), "\n";
 	}
     }
-    elsif (/^(\([0-9]+\) (#   )?)?!\s*(.*?)\s+(\S+)\s*$/)
+    elsif (/^($prefix_re)?!\s*(.*?)\s+(\S+)\s*$/)
     {
-	my ($prefix, $name, $result) = ($1, $3, $4);
+	my ($prefix, $name, $result) = ($1, $2, $3);
 
 	if ($startup) {
 	    $file = "";
