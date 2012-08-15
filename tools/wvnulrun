@@ -1,0 +1,215 @@
+#!/usr/bin/perl -w
+#
+# @file
+# Script to supervise the execution of wvtest-based tests.
+#
+# It takes care of killing test (qemu or serial reader) when the test
+# finishes or hangs.
+#
+# Copyright (C) 2011, 2012, Michal Sojka <sojka@os.inf.tu-dresden.de>
+# Economic rights: Technische Universitaet Dresden (Germany)
+#
+# This file is part of NUL (NOVA user land).
+#
+# NUL is free software: you can redistribute it and/or
+# modify it under the terms of the GNU General Public License version
+# 2 as published by the Free Software Foundation.
+#
+# NUL is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+# General Public License version 2 for more details.
+#/
+
+use strict;
+use IO::Pty;
+
+# always flush
+$| = 1;
+
+my $istty = -t STDOUT && $ENV{'TERM'} ne "dumb";
+my $pty = new IO::Pty;
+
+my $pid = fork();
+die "Cannot fork" if not defined $pid;
+if (!$pid) {
+    # child
+    $pty->make_slave_controlling_terminal();
+#    setpgrp(); # Terminal won't send signals to the child
+    my $slave = $pty->slave();
+    close $pty;
+    $slave->clone_winsize_from(\*STDIN) if $istty;
+    $slave->set_raw();
+
+    open(STDIN,"<&". $slave->fileno())
+      or die "Couldn't reopen STDIN for reading, $!\n";
+    open(STDOUT,">&". $slave->fileno())
+      or die "Couldn't reopen STDOUT for writing, $!\n";
+    open(STDERR,">&". $slave->fileno())
+      or die "Couldn't reopen STDERR for writing, $!\n";
+
+    close $slave;
+
+    exec(@ARGV);
+    die "Cannot exec(@ARGV): $!";
+}
+
+$pty->close_slave();
+#$pty->set_raw(); # from IO::Pty "try" script. Do we need this?
+
+sub winch {
+  $pty->slave->clone_winsize_from(\*STDIN);
+  kill WINCH => $pid if $pid;
+  $SIG{WINCH} = \&winch;
+}
+
+$SIG{WINCH} = \&winch if $istty;
+
+sub bigkill($)
+{
+    my $pid = shift;
+    ($pid > 0) || die("pid is '$pid'?!\n");
+    my $count;
+    local $SIG{CHLD} = sub { }; # this will wake us from sleep() faster
+    $count = kill -15, $pid;
+    sleep(2);
+
+    kill -9, $pid if ($pid > 1);
+
+    exit(125);
+}
+
+my $timeout = 100;
+
+# parent
+local $SIG{INT} = sub { bigkill($pid); };
+local $SIG{TERM} = sub { bigkill($pid); };
+local $SIG{ALRM} = sub {
+    print STDERR "! $0: Alarm timed out!  No test output for $timeout seconds.  FAILED\n";
+    bigkill($pid);
+};
+
+my $allstart = time();
+my ($start, $stop);
+my $tests_executed = 0;
+my $tests_failed = 0;
+my $waits_for_child = 0;
+my $kill_ok = 0;
+my $ignore_exit_patterns = 0;
+my $expected_test_count = 0;
+my $expected_test_base = 0;
+
+sub matches_exit_pattern($)
+{
+    return 0 if $ignore_exit_patterns;
+    if ($ENV{WVTEST_EXIT_PATTERN}) {
+	return /$ENV{WVTEST_EXIT_PATTERN}/
+    } else {
+	return
+	    (/sc: done.$/ && $waits_for_child) ||
+	    /resetting machine via method/ ||
+	    /wvtest: done\s*$/ ||
+	    / # .*System halted. *$/
+	    ;
+    }
+}
+
+sub check_number_of_tests()
+{
+    if ($expected_test_count) {
+	my $executed = $tests_executed - $expected_test_base;
+	my $result;
+	if ($executed == $expected_test_count) {
+	    $result = "ok";
+	} else {
+	    $result = "FAILED";
+	    $tests_failed++;
+	    print "Expected $expected_test_count tests, executed $executed tests.\n"
+	}
+	print "! $0: tests_expected == tests_executed  $result\n";
+    }
+}
+
+my $wvtest_output;
+if ($ENV{WVTEST_OUTPUT}) {
+    open $wvtest_output, ">", $ENV{WVTEST_OUTPUT};
+}
+
+alarm($timeout);
+while (<$pty>)
+{
+    alarm($timeout);
+    print;
+    print $wvtest_output $_ if $wvtest_output;
+    chomp;
+    s/\r//g;
+
+    if (/^(\([0-9]+\) (#   )?)?!\s*(.*?)\s+(\S+)\s*$/) {
+	$tests_executed++;
+	$tests_failed++ if ($4 ne "ok");
+    }
+    elsif (/wvtest: timeout (\d+)\s*$/) {
+	$timeout=$1;
+	alarm($timeout);
+    }
+    elsif (/sc: wait for child/) { $waits_for_child = 1; }
+    elsif (/wvtest: ignore exit patterns/) { $ignore_exit_patterns = 1; }
+    elsif (/wvtest: expect ([0-9]+) tests/) {
+	check_number_of_tests();
+	$expected_test_count = $1;
+	$expected_test_base = $tests_executed;
+    }
+    elsif (matches_exit_pattern($_))
+    {
+	if (!$ENV{WVTEST_NOKILL}) {
+	    kill 15, $pid;	# Kill novaboot or qemu
+	    $kill_ok = 1;
+	} else {
+	    use POSIX;
+	    my $pid = fork();
+	    if ($pid) {
+		print "Keeping PID $pid alive\n";
+		print $wvtest_output "Keeping PID $pid alive\n" if $wvtest_output;
+		close($wvtest_output) if $wvtest_output;
+		POSIX::_exit(0);
+	    } else {
+		# Continue printing on background
+		close($wvtest_output) if $wvtest_output;
+		while (<$pty>) { print; }
+		POSIX::_exit(0);
+	    }
+	}
+    }
+}
+my $newpid = waitpid($pid, 0);
+if ($newpid != $pid) {
+    die("waitpid returned '$newpid', expected '$pid'\n");
+}
+
+my $code = $?;
+my $ret = ($code >> 8);
+
+if ($code && !$ret) {
+    if ($kill_ok && $code == 15) {
+	# We have killed the child - it is OK
+	$code = 0;
+    } else {
+	# return death-from-signal exits as >128.  This is what bash does if you ran
+	# the program directly.
+	$ret = $code | 128;
+    }
+}
+
+if ($ret != 0) {
+    print "! $0: Program '", join(" ", @ARGV), "' returned non-zero exit code ($ret)  FAILED\n";
+}
+
+if (!$ENV{WVTEST_EXIT_PATTERN}) {
+    printf "! $0: \$tests_executed > 0  %s\n", ($tests_executed > 0) ? "ok" : "FAILED";
+}
+check_number_of_tests();
+
+if ($tests_failed > 0) { $ret = 1; }
+if ($ret == 0 && $tests_executed == 0) { $ret = 1; }
+
+exit $ret;
