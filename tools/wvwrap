@@ -6,6 +6,10 @@
 #       Licensed under the GNU Library General Public License, version 2.
 #       See the included file named LICENSE for license information.
 #
+# This script wraps long wvtest protocol lines. I use it as follows to
+# produce nicely formated emails:
+# COLUMNS=80 wvformat < wvtest.log | wvwrap | mail -s Log me@example.com
+
 use strict;
 use Getopt::Long;
 
@@ -15,6 +19,9 @@ sub usage() {
 }
 
 usage() if (@ARGV > 0);
+
+# Optional prefix of wvtest protocol lines
+my $prefix_re = '\([0-9]+\) (?:#   )?';
 
 my $istty = -t STDOUT && $ENV{'TERM'} ne "dumb";
 my $columns;

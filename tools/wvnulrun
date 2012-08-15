@@ -1,10 +1,14 @@
 #!/usr/bin/perl -w
 #
 # @file
-# Script to supervise the execution of wvtest-based tests.
+# Script to supervise the execution of wvtest-based tests. It is a
+# modified version of wvtestrun with some features added and without
+# pretty-printing which was moved to wvformat script.
 #
 # It takes care of killing test (qemu or serial reader) when the test
-# finishes or hangs.
+# finishes or hangs. It has flexible timeout management and is able to
+# check that the number of executed assertions is the same as was
+# expected.
 #
 # Copyright (C) 2011, 2012, Michal Sojka <sojka@os.inf.tu-dresden.de>
 # Economic rights: Technische Universitaet Dresden (Germany)
