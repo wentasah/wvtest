@@ -8,7 +8,7 @@ runtests: all
 	t/wvtest
 
 test: all
-	../wvtestrun $(MAKE) runtests
+	../wvtool run $(MAKE) runtests
 
 clean::
 	rm -f *~ t/*~ *.o t/*.o t/wvtest

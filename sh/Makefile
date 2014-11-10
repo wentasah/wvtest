@@ -7,7 +7,7 @@ runtests:
 	t/twvtest.sh
 
 test:
-	../wvtestrun $(MAKE) runtests
+	../wvtool run t/twvtest.sh
 
 clean::
 	rm -f *~ t/*~

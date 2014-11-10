@@ -11,7 +11,7 @@ runtests:
 	python basedir_test.py
 
 test:
-	../wvtestrun $(MAKE) runtests
+	../wvtool run $(MAKE) runtests
 
 clean::
 	rm -f *~ t/*~ *.pyc t/*.pyc

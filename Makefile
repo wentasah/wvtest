@@ -17,7 +17,7 @@ runtests: build
 
 
 test: build
-	./wvtestrun $(MAKE) runtests
+	./wvtool run $(MAKE) runtests
 
 clean::
 	rm -f *~ .*~
