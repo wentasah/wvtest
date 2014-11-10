@@ -190,9 +190,10 @@ class WvTestLog(list):
 
     def _finishCurrentTest(self):
         if self.currentTestFailedCount > 0:
-            if self.verbosity <= self.Verbosity.NORMAL:
+            if self.verbosity >= self.Verbosity.NORMAL:
                 self.print()
-                #self.currentTest.asWvCheckLine('FAILED').print()
+            else:
+                self.currentTest.asWvCheckLine('FAILED').print()
             self.testFailedCount += 1
         else:
             if self.verbosity <= self.Verbosity.NORMAL:
