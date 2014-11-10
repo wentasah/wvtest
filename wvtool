@@ -270,7 +270,7 @@ def _run(command, log):
     signal.signal(signal.SIGALRM, alarm)
 
     cmd = command if isinstance(command, str) else ' '.join(command)
-    log.setImplicitTestTitle(WvTestingLine("All", cmd))
+    log.setImplicitTestTitle(WvTestingLine("Executing "+cmd, "wvtool"))
 
     # Popen does not seep to be able to call setpgrp(). Therefore, we
     # use start_new_session, but this also create a new session and
@@ -305,12 +305,12 @@ def do_runall(args, log):
 def do_format(args, log):
     files = args.infiles
     if len(files) == 0:
-        log.setImplicitTestTitle(WvTestingLine("All", "stdin"))
+        log.setImplicitTestTitle(WvTestingLine("Preamble", "stdin"))
         for line in sys.stdin:
             log.addLine(line)
     else:
         for fn in args.infiles:
-            log.setImplicitTestTitle(WvTestingLine("All", fn))
+            log.setImplicitTestTitle(WvTestingLine("Preamble", fn))
             for line in open(fn):
                 log.addLine(line)
 
