@@ -99,6 +99,15 @@ class WvPlainLine(WvLine):
 
 class WvTestingLine(WvLine):
     re = re.compile('(?P<prefix>' + re_prefix + ')Testing "(?P<what>.*)" in (?P<where>.*):$')
+    def __init__(self, *args):
+        if len(args) == 1:
+            WvLine.__init__(self, args[0])
+        elif len(args) == 2:
+            self.prefix = ''
+            self.what = args[0]
+            self.where = args[1]
+        else:
+            raise TypeError("WvTestingLine.__init__() takes at most 2 positional arguments")
     def __str__(self):
         return '{self.prefix}! Testing "{self.what}" in {self.where}:'.format(self=self)
     def print(self):
@@ -144,33 +153,55 @@ class WvTagLine(WvLine):
     re  = re.compile('(?P<prefix>' + re_prefix + ')wvtest:\s*(?P<tag>.*)$')
 
 class WvTestLog(list):
-    def __init__(self, verbose = False):
+
+    class Verbosity:
+        # Print one line for each "Testing" section. Passed tests are
+        # printed as "ok", failed tests as "FAILURE".
+        SUMMARY = 1
+
+        # Print one "ok" line for each passing "Testing" section.
+        # Failed "Testing" sections are printed verbosely.
+        NORMAL  = 2
+
+        # Print every line of the output, just
+        # reformat/syntax-highlight known lines.
+        VERBOSE = 3
+
+    def __init__(self, verbosity = Verbosity.NORMAL):
         self.checkCount = 0
         self.checkFailedCount = 0
         self.testCount = 0
         self.testFailedCount = 0
 
+        self.implicitTestTitle = None
         self.currentTest = None
         self.currentTestFailedCount = 0
 
-        self.verbose = verbose
+        self.verbosity = verbosity
+
+    def setImplicitTestTitle (self, testing):
+        """If the test does not supply its own title as a first line of test
+        output, it this title will be used instead."""
+        self.implicitTestTitle = testing
 
     def print(self):
         for entry in self:
             entry.print()
 
+    def _finishCurrentTest(self):
+        if self.currentTestFailedCount > 0:
+            if self.verbosity <= self.Verbosity.NORMAL:
+                self.print()
+                #self.currentTest.asWvCheckLine('FAILED').print()
+            self.testFailedCount += 1
+        else:
+            if self.verbosity <= self.Verbosity.NORMAL:
+                self.currentTest.asWvCheckLine('ok').print()
+        self.clear()
+
     def _newTest(self, testing):
         if self.currentTest:
-            if self.currentTestFailedCount > 0:
-                if not self.verbose:
-                    self.print()
-                    #self.currentTest.asWvCheckLine('FAILED').print()
-                self.testFailedCount += 1
-            else:
-                if not self.verbose:
-                    self.currentTest.asWvCheckLine('ok').print()
-            self.clear()
-
+            self._finishCurrentTest()
         if testing != None:
             self.testCount += 1
         self.currentTest = testing
@@ -181,6 +212,23 @@ class WvTestLog(list):
         if not check.is_success():
             self.checkFailedCount += 1
             self.currentTestFailedCount += 1
+
+    def append(self, logEntry):
+        if self.implicitTestTitle and type(logEntry) != WvTestingLine:
+            self._newTest(self.implicitTestTitle)
+            super().append(self.implicitTestTitle)
+        self.implicitTestTitle = None
+
+        if type(logEntry) == WvTestingLine:
+            self._newTest(logEntry)
+        elif type(logEntry) == WvCheckLine:
+            self._newCheck(logEntry)
+
+        list.append(self, logEntry)
+
+        if self.verbosity == self.Verbosity.VERBOSE:
+            self.print()
+            self.clear()
 
     def addLine(self, line):
         line = line.rstrip()
@@ -195,16 +243,6 @@ class WvTestLog(list):
             raise Exception("Non-matched line: {}".format(line))
 
         self.append(logEntry)
-
-    def append(self, logEntry):
-        if self.verbose:
-            logEntry.print()
-
-        if type(logEntry) == WvTestingLine:
-            self._newTest(logEntry)
-        elif type(logEntry) == WvCheckLine:
-            self._newCheck(logEntry)
-        list.append(self, logEntry)
 
     def done(self):
         self._newTest(None)
@@ -230,6 +268,9 @@ def _run(command, log):
     signal.signal(signal.SIGTERM, kill_child)
     signal.signal(signal.SIGALRM, alarm)
 
+    cmd = command if isinstance(command, str) else ' '.join(command)
+    log.setImplicitTestTitle(WvTestingLine("All", cmd))
+
     # Popen does not seep to be able to call setpgrp(). Therefore, we
     # use start_new_session, but this also create a new session and
     # detaches the process from a terminal. This might be a problem
@@ -249,58 +290,63 @@ def _run(command, log):
         else:
             msg = "{wvtool}: Program '{cmd}' terminated by signal {sig}"
 
-        text = msg.format(wvtool=sys.argv[0], cmd=' '.join(command),
+        text = msg.format(wvtool=sys.argv[0], cmd=cmd,
                           ec=proc.returncode, sig=-proc.returncode)
         log.append(WvCheckLine(text, 'FAILED'))
 
-def do_run(args):
-    log = WvTestLog(args.verbose)
-
+def do_run(args, log):
     _run(args.command, log)
 
-    log.done()
-    sys.exit(0 if log.is_success() else 1)
-
-def do_runall(args):
-    log = WvTestLog(args.verbose)
-
+def do_runall(args, log):
     for cmd in args.commands:
-        _run([cmd], log)
+        _run(cmd, log)
 
-    log.done()
-    sys.exit(0 if log.is_success() else 1)
+def do_format(args, log):
+    files = args.infiles
+    if len(files) == 0:
+        log.setImplicitTestTitle(WvTestingLine("All", "stdin"))
+        for line in sys.stdin:
+            log.addLine(line)
+    else:
+        for fn in args.infiles:
+            log.setImplicitTestTitle(WvTestingLine("All", fn))
+            for line in open(fn):
+                log.addLine(line)
 
-def do_format(args):
-    pass
-
-def do_wrap(args):
+def do_wrap(args, log):
     pass
 
 parser = argparse.ArgumentParser(description='Versatile wvtest tool')
+
+parser.set_defaults(verbosity=WvTestLog.Verbosity.NORMAL)
+parser.add_argument('-v', '--verbose', dest='verbosity', action='store_const',
+                    const=WvTestLog.Verbosity.VERBOSE,
+                    help='Do not hide output of successful tests')
+parser.add_argument('-s', '--summary', dest='verbosity', action='store_const',
+                    const=WvTestLog.Verbosity.SUMMARY,
+                    help='''Hide output of all tests. Print just one line for each "Testing"
+                    section and report "ok" or "FAILURE" of it.''')
+
 subparsers = parser.add_subparsers(help='sub-command help')
 
-parser_run = subparsers.add_parser('run',
-                                   help='Run and supervise a command producing wvtest output')
-parser_run.add_argument('-v', '--verbose', action='store_true',
-                        help='Print all output produced by the command')
-parser_run.add_argument('command', nargs=argparse.REMAINDER,
-                        help='Command to run')
+parser_run = subparsers.add_parser('run', help='Run and supervise a command producing wvtest output')
+parser_run.add_argument('command', nargs=argparse.REMAINDER, help='Command to run')
 parser_run.set_defaults(func=do_run)
 
-parser_runall = subparsers.add_parser('runall',
-                                      help='Run multiple scripts/binaries mentioned on command line')
+parser_runall = subparsers.add_parser('runall', help='Run multiple scripts/binaries mentioned on command line')
 parser_runall.set_defaults(func=do_runall)
-parser_runall.add_argument('commands', nargs='+',
-                        help='Scripts/binaries to run')
-parser_runall.add_argument('-v', '--verbose', action='store_true',
-                           help='Print all output produced by the commands')
+parser_runall.add_argument('commands', nargs='+', help='Scripts/binaries to run')
 
-
-# parser_format = subparsers.add_parser('format')
-# parser_format.set_defaults(func=do_format)
+parser_format = subparsers.add_parser('format', help='Reformat/highlight/summarize WvTest protcol output')
+parser_format.set_defaults(func=do_format)
+parser_format.add_argument('infiles', nargs='*', help='Files with wvtest output')
 
 # parser_wrap = subparsers.add_parser('wrap')
 # parser_wrap.set_defaults(func=do_wrap)
 
 args = parser.parse_args()
-args.func(args)
+
+log = WvTestLog(args.verbosity)
+args.func(args, log)
+log.done()
+sys.exit(0 if log.is_success() else 1)
