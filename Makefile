@@ -3,10 +3,12 @@ all: build
 	@echo
 	@echo "Try: make test"
 
+VERSION=$(shell git describe --always --match='v[0-9]')
+
 wvtool: wvtool.py FORCE
-	sed -e '' $< > $@
+	python3 $< format sample-ok # Quick syntax check
+	sed -e '/^version = .*/ s//version = "$(VERSION)"/' $< > $@
 	chmod +x $@
-	./$@ format sample-ok sample-error # Quick syntax error check
 
 FORCE:
 

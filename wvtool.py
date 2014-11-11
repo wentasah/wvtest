@@ -11,7 +11,11 @@ provides some other useful features. Namely:
 - TODO: Conversion to HTML
 - TODO: Variable timeout
 - TODO: Checking of expected number of tests
+
+Newest version can be found at https://github.com/wentasah/wvtest.
 """
+
+version = "git" # This get repaced by make
 
 import argparse
 import subprocess as sp
@@ -338,6 +342,7 @@ parser.add_argument('-s', '--summary', dest='verbosity', action='store_const',
                     const=WvTestLog.Verbosity.SUMMARY,
                     help='''Hide output of all tests. Print just one line for each "Testing"
                     section and report "ok" or "FAILURE" of it.''')
+parser.add_argument('--version', action='version', version='%(prog)s '+version)
 
 subparsers = parser.add_subparsers(help='sub-command help')
 
