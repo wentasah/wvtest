@@ -369,6 +369,10 @@ parser_format.add_argument('infiles', nargs='*', help='Files with wvtest output'
 
 args = parser.parse_args()
 
+if not 'func' in args:
+    parser.print_help()
+    sys.exit(1)
+
 log = WvTestLog(args.verbosity)
 args.func(args, log)
 log.done()
