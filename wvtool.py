@@ -215,6 +215,9 @@ class WvTestLog(list):
         sys.stdout.flush()
         self.clear()
 
+    def clear(self):
+        del self[:]
+
     def _newTest(self, testing):
         if self.currentTest:
             self._finishCurrentTest()
