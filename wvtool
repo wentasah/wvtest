@@ -3,6 +3,16 @@
 # Copyright 2014 Michal Sojka <sojkam1@fel.cvut.cz>
 # License: GPLv2+
 
+"""Versatile WvTest protocol tool. It replaces wvtestrun script and
+provides some other useful features. Namely:
+- Summary mode (--summary)
+- Test results aligned to the same column
+- FIXME: No "progress" reporting
+- TODO: Conversion to HTML
+- TODO: Variable timeout
+- TODO: Checking of expected number of tests
+"""
+
 import argparse
 import subprocess as sp
 import re
