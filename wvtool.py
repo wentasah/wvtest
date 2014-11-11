@@ -360,7 +360,7 @@ parser_runall = subparsers.add_parser('runall', help='Run multiple scripts/binar
 parser_runall.set_defaults(func=do_runall)
 parser_runall.add_argument('commands', nargs='+', help='Scripts/binaries to run')
 
-parser_format = subparsers.add_parser('format', help='Reformat/highlight/summarize WvTest protcol output')
+parser_format = subparsers.add_parser('format', help='Reformat/highlight/summarize WvTest protocol output')
 parser_format.set_defaults(func=do_format)
 parser_format.add_argument('infiles', nargs='*', help='Files with wvtest output')
 
