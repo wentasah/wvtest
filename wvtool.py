@@ -362,3 +362,7 @@ log = WvTestLog(args.verbosity)
 args.func(args, log)
 log.done()
 sys.exit(0 if log.is_success() else 1)
+
+# Local Variables:
+# compile-command: "make wvtool"
+# End:

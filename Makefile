@@ -3,7 +3,14 @@ all: build
 	@echo
 	@echo "Try: make test"
 
-build:
+wvtool: wvtool.py FORCE
+	sed -e '' $< > $@
+	chmod +x $@
+	./$@ format sample-ok sample-error # Quick syntax error check
+
+FORCE:
+
+build: wvtool
 	$(MAKE) -C dotnet all
 	$(MAKE) -C cpp all
 	$(MAKE) -C c all
