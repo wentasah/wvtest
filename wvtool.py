@@ -230,10 +230,16 @@ class WvTestLog(list):
             self.currentTestFailedCount += 1
 
     def append(self, logEntry):
-        if self.implicitTestTitle and type(logEntry) != WvTestingLine:
-            self._newTest(self.implicitTestTitle)
-            super().append(self.implicitTestTitle)
-        self.implicitTestTitle = None
+        if self.implicitTestTitle:
+            if str(logEntry) == '':
+                pass
+            elif type(logEntry) != WvTestingLine:
+                self._newTest(self.implicitTestTitle)
+                super().append(self.implicitTestTitle)
+                self.implicitTestTitle = None
+            else:
+                self.implicitTestTitle = None
+
 
         if type(logEntry) == WvTestingLine:
             self._newTest(logEntry)
