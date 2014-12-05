@@ -78,6 +78,8 @@ class Term:
 
         self.width = self._get_width()
         self._enabled = True
+        self._progress_msg = ''
+        self._progress_idx = 0
 
     def _raw_write(self, string):
         '''Write raw data if output is enabled.'''
@@ -235,6 +237,8 @@ class WvTestLog(list):
     def _finishCurrentTest(self):
         if self.currentTestFailedCount > 0:
             if self.verbosity >= self.Verbosity.NORMAL:
+                if self.show_progress:
+                    term.clear_progress_msg()
                 self.print()
             else:
                 self.currentTest.asWvCheckLine('FAILED').print()
@@ -284,8 +288,6 @@ class WvTestLog(list):
         list.append(self, logEntry)
 
         if self.verbosity == self.Verbosity.VERBOSE:
-            if self.show_progress:
-                term.clear_progress_msg()
             self.print()
             self.clear()
         else:
