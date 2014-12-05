@@ -29,13 +29,14 @@ import math
 re_prefix = ''
 
 class Term:
-    reset         = '\033[0m'
-    bold          = '\033[01m'
-    disable       = '\033[02m'
-    underline     = '\033[04m'
-    reverse       = '\033[07m'
-    strikethrough = '\033[09m'
-    invisible     = '\033[08m'
+    class attr:
+        reset         = '\033[0m'
+        bold          = '\033[01m'
+        disable       = '\033[02m'
+        underline     = '\033[04m'
+        reverse       = '\033[07m'
+        strikethrough = '\033[09m'
+        invisible     = '\033[08m'
     class fg:
         black      = '\033[30m'
         red        = '\033[31m'
@@ -62,40 +63,68 @@ class Term:
         cyan      = '\033[46m'
         lightgrey = '\033[47m'
 
-    def __init__(self, use_colors):
-        def clear_colors(obj):
-            for key in dir(obj):
+    progress_chars = '|/-\\'
+
+    def __init__(self):
+        if os.environ['TERM'] == 'dumb':
+            self.output = None
+        else:
+            try:
+                self.output = open('/dev/tty', 'w')
+            except IOError:
+                self.output = None
+
+        if not self.output:
+            self._clear_colors()
+
+        self.width = self._get_width()
+        self._enabled = True
+
+    def _raw_write(self, string):
+        '''Write raw data if output is enabled.'''
+        if self._enabled and self.output:
+            try:
+                self.output.write(string)
+                self.output.flush()
+            except IOError:
+                self._enabled = False
+
+    def _get_width(self):
+        try:
+            import fcntl, termios, struct, os
+            s = struct.pack('HHHH', 0, 0, 0, 0)
+            x = fcntl.ioctl(self.output.fileno(), termios.TIOCGWINSZ, s)
+            return struct.unpack('HHHH', x)[1]
+        except:
+            return int(getattr(os.environ, 'COLUMNS', 80))
+
+    def _clear_colors(self):
+        '''Sets all color and attribute memebers to empty strings'''
+        for cls in ('attr', 'fg', 'bg'):
+            c = getattr(self, cls)
+            for key in dir(c):
                 if key[0] == '_':
                     continue
-                if key in ('fg', 'bg'):
-                    clear_colors(getattr(obj, key))
-                    continue
-                setattr(obj, key, '')
+                setattr(c, key, '')
 
-        if not use_colors:
-            clear_colors(self)
+    def set_progress_msg(self, msg):
+        self._progress_msg = msg
+        self._progress_idx = 0
+        self.update_progress_msg()
 
-        if use_colors:
-            def ioctl_GWINSZ(fd):
-                try:
-                    import fcntl, termios, struct, os
-                    cr = struct.unpack('hh', fcntl.ioctl(fd, termios.TIOCGWINSZ, '1234'))
-                except:
-                    return
-                return cr
-            cr = ioctl_GWINSZ(1)
-            if not cr:
-                try:
-                    fd = os.open(os.ctermid(), os.O_RDONLY)
-                    cr = ioctl_GWINSZ(fd)
-                    os.close(fd)
-                except:
-                    pass
-            self.width = cr[1]
-        else:
-            self.width = int(getattr(os.environ, 'COLUMNS', 80))
+    def update_progress_msg(self):
+        self._progress_idx += 1
+        if self._progress_idx >= len(self.progress_chars):
+            self._progress_idx = 0
+        if self.output:
+            self._raw_write(self._progress_msg[:self.width - 3] + " " + self.progress_chars[self._progress_idx] + "\r")
 
-term = Term(sys.stdout.isatty() and os.environ['TERM'] != 'dumb')
+    def clear_progress_msg(self):
+        if self.output:
+            self._raw_write(' '*(len(self._progress_msg[:self.width - 3]) + 2) + "\r")
+
+
+term = Term()
 
 class WvLine:
     def __init__(self, match):
@@ -125,7 +154,7 @@ class WvTestingLine(WvLine):
     def __str__(self):
         return '{self.prefix}! Testing "{self.what}" in {self.where}:'.format(self=self)
     def print(self):
-        print(term.bold + str(self) + term.reset)
+        print(term.attr.bold + str(self) + term.attr.reset)
 
     def asWvCheckLine(self, result):
         return WvCheckLine('{self.where}  {self.what}'.format(self=self), result)
@@ -143,7 +172,8 @@ class WvCheckLine(WvLine):
             raise TypeError("WvCheckLine.__init__() takes at most 2 positional arguments")
 
     def __str__(self):
-        return '{self.prefix}! {self.text} {self.result}'.format(self=self)
+        # Result == None when printing progress message
+        return '{self.prefix}! {self.text} {result}'.format(self=self, result=(self.result or ''))
 
     def is_success(self):
         return self.result == 'ok'
@@ -154,7 +184,7 @@ class WvCheckLine(WvLine):
             color = term.fg.lightgreen
         else:
             color = term.fg.lightred
-        result = term.bold + color + self.result + term.reset
+        result = term.attr.bold + color + self.result + term.attr.reset
 
         lines = math.ceil(len(text) / term.width)
         if len(text) % term.width > term.width - 10:
@@ -192,6 +222,7 @@ class WvTestLog(list):
         self.currentTestFailedCount = 0
 
         self.verbosity = verbosity
+        self.show_progress = False
 
     def setImplicitTestTitle (self, testing):
         """If the test does not supply its own title as a first line of test
@@ -218,21 +249,23 @@ class WvTestLog(list):
     def clear(self):
         del self[:]
 
-    def _newTest(self, testing):
+    def _newTest(self, testing : WvTestingLine):
         if self.currentTest:
             self._finishCurrentTest()
         if testing != None:
             self.testCount += 1
+            if self.show_progress and self.verbosity < self.Verbosity.VERBOSE:
+                term.set_progress_msg(str(testing.asWvCheckLine(None)))
         self.currentTest = testing
         self.currentTestFailedCount = 0
 
-    def _newCheck(self, check):
+    def _newCheck(self, check : WvCheckLine):
         self.checkCount += 1
         if not check.is_success():
             self.checkFailedCount += 1
             self.currentTestFailedCount += 1
 
-    def append(self, logEntry):
+    def append(self, logEntry : WvLine):
         if self.implicitTestTitle:
             if str(logEntry) == '':
                 pass
@@ -252,8 +285,13 @@ class WvTestLog(list):
         list.append(self, logEntry)
 
         if self.verbosity == self.Verbosity.VERBOSE:
+            if self.show_progress:
+                term.clear_progress_msg()
             self.print()
             self.clear()
+        else:
+            if self.show_progress:
+                term.update_progress_msg()
 
     def addLine(self, line):
         line = line.rstrip()
@@ -279,6 +317,7 @@ class WvTestLog(list):
         return self.testFailedCount == 0
 
 def _run(command, log):
+    log.show_progress = True
     timeout = 100
 
     def kill_child(sig = None, frame = None):
