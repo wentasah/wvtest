@@ -7,7 +7,6 @@
 provides some other useful features. Namely:
 - Summary mode (--summary)
 - Test results aligned to the same column
-- FIXME: No "progress" reporting
 - TODO: Conversion to HTML
 - TODO: Variable timeout
 - TODO: Checking of expected number of tests
