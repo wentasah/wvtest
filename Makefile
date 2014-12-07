@@ -3,7 +3,7 @@ all: build
 	@echo
 	@echo "Try: make test"
 
-VERSION=$(shell git describe --always --match='v[0-9]')
+VERSION=$(shell git describe --dirty --always --match='v[0-9]')
 
 wvtool: wvtool.py FORCE
 	python3 -m py_compile $< # Syntax check
