@@ -6,7 +6,8 @@ all: build
 VERSION=$(shell git describe --always --match='v[0-9]')
 
 wvtool: wvtool.py FORCE
-	python3 $< format sample-ok # Quick syntax check
+	python3 -m py_compile $< # Syntax check
+	python3 $< format sample-ok # Quick functionality check
 	sed -e '/^version = .*/ s//version = "$(VERSION)"/' $< > $@
 	chmod +x $@
 
