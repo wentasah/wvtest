@@ -23,6 +23,8 @@ import sys
 import os
 import signal
 import math
+import io
+import datetime
 
 # Regulr expression that matches potential prefixes to wvtest protocol lines
 re_prefix = ''
@@ -212,7 +214,7 @@ class WvTestLog(list):
         # reformat/syntax-highlight known lines.
         VERBOSE = 3
 
-    def __init__(self, verbosity = Verbosity.NORMAL):
+    def __init__(self, verbosity = Verbosity.NORMAL, junit_xml : io.IOBase = None):
         self.checkCount = 0
         self.checkFailedCount = 0
         self.testCount = 0
@@ -225,6 +227,13 @@ class WvTestLog(list):
         self.verbosity = verbosity
         self.show_progress = False
 
+        self.junit_xml = junit_xml
+
+        if junit_xml:
+            global wvjunit
+            import wvjunit
+            self.junitTestcases = []
+
     def setImplicitTestTitle (self, testing):
         """If the test does not supply its own title as a first line of test
         output, it this title will be used instead."""
@@ -234,7 +243,40 @@ class WvTestLog(list):
         for entry in self:
             entry.print()
 
+    def __str__(self):
+        s = ''
+        for entry in self:
+            s += str(entry) + "\n"
+        return s
+
+    def _rememberJUnitTestcase(self):
+        if not self.junit_xml:
+            return
+
+        failure = None
+        if self.currentTestFailedCount > 0:
+            failure = wvjunit.Failure(text=str(self))
+
+        tc = wvjunit.Testcase(classname = self.currentTest.where,
+                              name = self.currentTest.what,
+                              time = 'N/A',
+                              failure = failure)
+        self.junitTestcases.append(tc)
+
+    def _generateJUnitXML(self):
+        if not self.junit_xml:
+            return
+        ts = wvjunit.Testsuite(tests = self.testCount,
+                               failures = self.testFailedCount,
+                               errors = 0,
+                               name = 'N/A',
+                               time = 0,
+                               timestamp = datetime.datetime.now(),
+                               testcases = self.junitTestcases)
+        ts.print(file = self.junit_xml)
+
     def _finishCurrentTest(self):
+        self._rememberJUnitTestcase()
         if self.currentTestFailedCount > 0:
             if self.show_progress and self.verbosity < self.Verbosity.VERBOSE:
                 term.clear_progress_msg()
@@ -309,6 +351,8 @@ class WvTestLog(list):
 
     def done(self):
         self._newTest(None)
+
+        self._generateJUnitXML()
 
         print("WvTest: {total} test{plt}, {fail} failure{plf}."
               .format(total = self.testCount, plt = '' if self.testCount == 1 else 's',
@@ -390,6 +434,8 @@ parser.add_argument('-s', '--summary', dest='verbosity', action='store_const',
                     const=WvTestLog.Verbosity.SUMMARY,
                     help='''Hide output of all tests. Print just one line for each "Testing"
                     section and report "ok" or "FAILURE" of it.''')
+parser.add_argument('--junit-xml', type=argparse.FileType('w'),
+                    help='''Coonvert output to JUnit compatible XML in file''')
 parser.add_argument('--version', action='version', version='%(prog)s '+version)
 
 subparsers = parser.add_subparsers(help='sub-command help')
@@ -415,7 +461,7 @@ if not 'func' in args:
     parser.print_help()
     sys.exit(1)
 
-log = WvTestLog(args.verbosity)
+log = WvTestLog(args.verbosity, junit_xml = args.junit_xml)
 args.func(args, log)
 log.done()
 sys.exit(0 if log.is_success() else 1)
