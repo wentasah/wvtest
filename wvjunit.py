@@ -2,13 +2,17 @@ import datetime
 import types
 import inspect
 import sys
+from xml.sax.saxutils import escape
 
 class JUnitBase:
+    def _get_valid_members(self):
+        return [x for x in dir(self.__class__)
+                if not x.startswith('_') and
+                   not inspect.isfunction(getattr(self.__class__, x))]
+
     def __init__(self, **kwargs):
         """Initialize the object with kwargs as specified by class variables."""
-        valid_members = [x for x in dir(self.__class__) if
-                         not x.startswith('_') and
-                         not inspect.isfunction(getattr(self.__class__, x))]
+        valid_members = self._get_valid_members()
         for (key, val) in kwargs.items():
             if key in valid_members:
                 if type(val) == getattr(self.__class__, key) or val == None:
@@ -26,6 +30,13 @@ class JUnitBase:
             if key not in kwargs:
                 setattr(self, key, getattr(self.__class__, key).__call__())
 
+    def escaped_values(self):
+        class EscapedObject(object): pass
+        ret = EscapedObject()
+        for attr in self._get_valid_members():
+            setattr(ret, attr, escape(str(getattr(self, attr))))
+        return ret
+
     def print(self, file=sys.stdout):
         print(str(self), file=file)
 
@@ -42,8 +53,7 @@ class Failure(JUnitBase):
     text = str
 
     def __str__(self):
-        # TODO: Escape all texts for inclusion in XML
-        return '<failure type="{self.type}" message="{self.message}">{self.text}</failure>'.format(self=self)
+        return '<failure type="{self.type}" message="{self.message}">{self.text}</failure>'.format(self=self.escaped_values())
 
 class Testcase(JUnitBase):
     classname = str
@@ -52,7 +62,7 @@ class Testcase(JUnitBase):
     failure = Failure
 
     def print(self, file=sys.stdout):
-        print('<testcase classname="{self.classname}" name="{self.name}" time="{self.time}">'.format(self=self),
+        print('<testcase classname="{self.classname}" name="{self.name}" time="{self.time}">'.format(self=self.escaped_values()),
               file = file)
         if self.failure:
             self.failure.print(file)
@@ -74,7 +84,7 @@ class Testsuite(JUnitBase):
     def print(self, file = sys.stdout):
         print('<?xml version="1.0" encoding="UTF-8" ?>', file=file)
         ts = self.timestamp.replace(microsecond=0)
-        print('<testsuite tests="{self.tests}" errors="{self.errors}" failures="{self.failures}" hostname="{self.hostname}" name="{self.name}" time="{self.time}" timestamp="{timestamp}">'.format(self=self, timestamp=ts.isoformat()),\
+        print('<testsuite tests="{self.tests}" errors="{self.errors}" failures="{self.failures}" hostname="{self.hostname}" name="{self.name}" time="{self.time}" timestamp="{timestamp}">'.format(self=self.escaped_values(), timestamp=ts.isoformat()),
               file = file)
         print("<properties>", file=file)
         for p in self.properties:
