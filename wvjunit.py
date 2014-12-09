@@ -14,7 +14,10 @@ class JUnitBase:
                 if type(val) == getattr(self.__class__, key) or val == None:
                     v = val
                 else:
-                    v = getattr(self.__class__, key).__call__(val) # Construct the right type
+                    try:
+                        v = getattr(self.__class__, key).__call__(val) # Construct the right type
+                    except Exception as exc:
+                        raise Exception("Cannot construct '{}' from '{}'".format(key, val)) from  exc
                 setattr(self, key, v)
             else:
                 raise(Exception("'{key}' is not a valid member of '{cls}'".format(key=key, cls=self.__class__.__name__)))
@@ -70,7 +73,8 @@ class Testsuite(JUnitBase):
 
     def print(self, file = sys.stdout):
         print('<?xml version="1.0" encoding="UTF-8" ?>', file=file)
-        print('<testsuite tests="{self.tests}" errors="{self.errors}" failures="{self.failures}" hostname="{self.hostname}" name="{self.name}" time="{self.time}" timestamp="{self.timestamp}"'.format(self=self),\
+        ts = self.timestamp.replace(microsecond=0)
+        print('<testsuite tests="{self.tests}" errors="{self.errors}" failures="{self.failures}" hostname="{self.hostname}" name="{self.name}" time="{self.time}" timestamp="{timestamp}">'.format(self=self, timestamp=ts.isoformat()),\
               file = file)
         print("<properties>", file=file)
         for p in self.properties:

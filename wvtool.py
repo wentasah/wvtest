@@ -259,7 +259,7 @@ class WvTestLog(list):
 
         tc = wvjunit.Testcase(classname = self.currentTest.where,
                               name = self.currentTest.what,
-                              time = 'N/A',
+                              time = '0',   #TODO
                               failure = failure)
         self.junitTestcases.append(tc)
 
@@ -271,6 +271,7 @@ class WvTestLog(list):
                                errors = 0,
                                name = 'N/A',
                                time = 0,
+                               hostname="localhost",
                                timestamp = datetime.datetime.now(),
                                testcases = self.junitTestcases)
         ts.print(file = self.junit_xml)
