@@ -1,3 +1,10 @@
+"""Helper file for wvtool to export the results as JUnit compatible XML.
+
+This file is only required when JUnit XML output is enabled with
+--junit-xml switch. Without this switch, wvtool works even when this
+file is not present.
+"""
+
 import datetime
 import types
 import inspect
