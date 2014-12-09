@@ -39,6 +39,7 @@ class Failure(JUnitBase):
     text = str
 
     def __str__(self):
+        # TODO: Escape all texts for inclusion in XML
         return '<failure type="{self.type}" message="{self.message}">{self.text}</failure>'.format(self=self)
 
 class Testcase(JUnitBase):
