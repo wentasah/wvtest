@@ -236,11 +236,11 @@ class WvTestLog(list):
 
     def _finishCurrentTest(self):
         if self.currentTestFailedCount > 0:
-            if self.verbosity >= self.Verbosity.NORMAL:
-                if self.show_progress:
-                    term.clear_progress_msg()
+            if self.show_progress and self.verbosity < self.Verbosity.VERBOSE:
+                term.clear_progress_msg()
+            if self.verbosity == self.Verbosity.NORMAL:
                 self.print()
-            else:
+            elif self.verbosity < self.Verbosity.NORMAL:
                 self.currentTest.asWvCheckLine('FAILED').print()
             self.testFailedCount += 1
         else:
@@ -288,8 +288,7 @@ class WvTestLog(list):
         list.append(self, logEntry)
 
         if self.verbosity == self.Verbosity.VERBOSE:
-            self.print()
-            self.clear()
+            logEntry.print()
         else:
             if self.show_progress:
                 term.update_progress_msg()
