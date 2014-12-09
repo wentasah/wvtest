@@ -181,7 +181,7 @@ class WvCheckLine(WvLine):
     def is_success(self):
         return self.result == 'ok'
 
-    def print(self):
+    def formated(self):
         text = '{self.prefix}! {self.text} '.format(self=self)
         if self.is_success():
             color = term.fg.lightgreen
@@ -194,7 +194,10 @@ class WvCheckLine(WvLine):
             lines += 1
 
         text = format(text, '.<' + str(lines * term.width - 10))
-        print('{text} {result}'.format(text=text, result=result))
+        return '{text} {result}'.format(text=text, result=result)
+
+    def print(self):
+        print(self.formated())
 
 class WvTagLine(WvLine):
     re  = re.compile('(?P<prefix>' + re_prefix + ')wvtest:\s*(?P<tag>.*)$')
@@ -246,7 +249,11 @@ class WvTestLog(list):
     def __str__(self):
         s = ''
         for entry in self:
-            s += str(entry) + "\n"
+            if 'formated' in dir(entry):
+                e = entry.formated()
+            else:
+                e = str(entry)
+            s += e + "\n"
         return s
 
     def _rememberJUnitTestcase(self):
