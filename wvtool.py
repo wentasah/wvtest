@@ -392,9 +392,10 @@ def _run(command, log):
     # detaches the process from a terminal. This might be a problem
     # for programs that need a terminal to run.
     with sp.Popen(command, stdout=sp.PIPE, stderr=sp.STDOUT,
-                  universal_newlines=True, start_new_session=True) as proc:
+                  universal_newlines=False, start_new_session=True) as proc:
         signal.alarm(timeout)
-        for line in proc.stdout:
+        stdout = io.TextIOWrapper(proc.stdout, errors='replace')
+        for line in stdout:
             signal.alarm(timeout)
             log.addLine(line)
 
