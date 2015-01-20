@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2014 Michal Sojka <sojkam1@fel.cvut.cz>
+# Copyright 2014, 2015 Michal Sojka <sojkam1@fel.cvut.cz>
 # License: GPLv2+
 
 """Versatile WvTest protocol tool. It replaces wvtestrun script and
@@ -134,8 +134,13 @@ class WvLine:
         for (key, val) in match.groupdict().items():
             setattr(self, key, val)
 
-    def print(self):
-        print(str(self))
+    def print(self, file=sys.stdout):
+        "Print the line (terminal is expected on output)"
+        print(str(self), file=file)
+
+    def log(self, file=sys.stdout):
+        "Print the line (without terminal escape sequences)"
+        self.print(file)
 
 
 class WvPlainLine(WvLine):
@@ -156,8 +161,12 @@ class WvTestingLine(WvLine):
             raise TypeError("WvTestingLine.__init__() takes at most 2 positional arguments")
     def __str__(self):
         return '{self.prefix}! Testing "{self.what}" in {self.where}:'.format(self=self)
-    def print(self):
-        print(term.attr.bold + str(self) + term.attr.reset)
+
+    def print(self, file=sys.stdout):
+        print(term.attr.bold + str(self) + term.attr.reset, file=file)
+
+    def log(self, file):
+        print(str(self), file=file)
 
     def asWvCheckLine(self, result):
         return WvCheckLine('{self.where}  {self.what}'.format(self=self), result)
@@ -196,8 +205,13 @@ class WvCheckLine(WvLine):
         text = format(text, '.<' + str(lines * term.width - 10))
         return '{text} {result}'.format(text=text, result=result)
 
-    def print(self):
-        print(self.formated())
+    def print(self, file=sys.stdout):
+        print(self.formated(), file=file)
+
+    def log(self, file=sys.stdout):
+        text = '{self.prefix}! {self.text} '.format(self=self)
+        print('{text:.<80} {result}'.format(text=text, result=self.result), file=file)
+
 
 class WvTagLine(WvLine):
     re  = re.compile('(?P<prefix>' + re_prefix + ')wvtest:\s*(?P<tag>.*)$')
@@ -217,7 +231,8 @@ class WvTestLog(list):
         # reformat/syntax-highlight known lines.
         VERBOSE = 3
 
-    def __init__(self, verbosity = Verbosity.NORMAL, junit_xml : io.IOBase = None):
+    def __init__(self, verbosity = Verbosity.NORMAL, junit_xml : io.IOBase = None,
+                 logdir = None):
         self.checkCount = 0
         self.checkFailedCount = 0
         self.testCount = 0
@@ -237,14 +252,23 @@ class WvTestLog(list):
             import wvjunit
             self.junitTestcases = []
 
+        self.logdir = logdir
+        self.log = None
+        if logdir:
+            try:
+                os.mkdir(logdir)
+            except FileExistsError:
+                pass
+
+
     def setImplicitTestTitle (self, testing):
         """If the test does not supply its own title as a first line of test
         output, it this title will be used instead."""
         self.implicitTestTitle = testing
 
-    def print(self):
+    def print(self, file=sys.stdout):
         for entry in self:
-            entry.print()
+            entry.print(file=file)
 
     def __str__(self):
         s = ''
@@ -298,6 +322,8 @@ class WvTestLog(list):
                 self.currentTest.asWvCheckLine('ok').print()
         sys.stdout.flush()
         self.clear()
+        if self.log:
+            self.log.close()
 
     def clear(self):
         del self[:]
@@ -309,6 +335,11 @@ class WvTestLog(list):
             self.testCount += 1
             if self.show_progress and self.verbosity < self.Verbosity.VERBOSE:
                 term.set_progress_msg(str(testing.asWvCheckLine(None)))
+
+            if self.logdir:
+                self.log = open(os.path.join(self.logdir, "%s-%s.log" %
+                                             (testing.where, testing.what.lower().replace(' ', '_'))),
+                                'w')
         self.currentTest = testing
         self.currentTestFailedCount = 0
 
@@ -342,6 +373,9 @@ class WvTestLog(list):
         else:
             if self.show_progress:
                 term.update_progress_msg()
+
+        if self.log:
+            logEntry.log(self.log)
 
     def addLine(self, line):
         line = line.rstrip()
@@ -444,7 +478,9 @@ parser.add_argument('-s', '--summary', dest='verbosity', action='store_const',
                     help='''Hide output of all tests. Print just one line for each "Testing"
                     section and report "ok" or "FAILURE" of it.''')
 parser.add_argument('--junit-xml', type=argparse.FileType('w'),
-                    help='''Coonvert output to JUnit compatible XML in file''')
+                    help='''Convert output to JUnit compatible XML file''')
+parser.add_argument('--logdir',
+                    help='''Store test logs in the given directory''')
 parser.add_argument('--version', action='version', version='%(prog)s '+version)
 
 subparsers = parser.add_subparsers(help='sub-command help')
@@ -470,7 +506,7 @@ if not 'func' in args:
     parser.print_help()
     sys.exit(1)
 
-log = WvTestLog(args.verbosity, junit_xml = args.junit_xml)
+log = WvTestLog(args.verbosity, junit_xml = args.junit_xml, logdir=args.logdir)
 args.func(args, log)
 log.done()
 sys.exit(0 if log.is_success() else 1)
