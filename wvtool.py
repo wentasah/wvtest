@@ -25,6 +25,7 @@ import signal
 import math
 import io
 import datetime
+import time
 
 # Regulr expression that matches potential prefixes to wvtest protocol lines
 re_prefix = ''
@@ -290,7 +291,7 @@ class WvTestLog(list):
 
         tc = wvjunit.Testcase(classname = self.currentTest.where,
                               name = self.currentTest.what,
-                              time = '0',   #TODO
+                              time = time.time() - self.testStartTime,
                               failure = failure)
         self.junitTestcases.append(tc)
 
@@ -340,6 +341,7 @@ class WvTestLog(list):
                 self.log = open(os.path.join(self.logdir, "%s-%s.log" %
                                              (testing.where, testing.what.lower().replace(' ', '_'))),
                                 'w')
+            self.testStartTime = time.time()
         self.currentTest = testing
         self.currentTestFailedCount = 0
 

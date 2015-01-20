@@ -41,7 +41,10 @@ class JUnitBase:
         class EscapedObject(object): pass
         ret = EscapedObject()
         for attr in self._get_valid_members():
-            setattr(ret, attr, escape(str(getattr(self, attr))))
+            if type(getattr(self, attr)) not in [float]:
+                setattr(ret, attr, escape(str(getattr(self, attr))))
+            else:
+                setattr(ret, attr, getattr(self, attr))
         return ret
 
     def print(self, file=sys.stdout):
@@ -65,11 +68,11 @@ class Failure(JUnitBase):
 class Testcase(JUnitBase):
     classname = str
     name = str
-    time = str
+    time = float
     failure = Failure
 
     def print(self, file=sys.stdout):
-        print('<testcase classname="{self.classname}" name="{self.name}" time="{self.time}">'.format(self=self.escaped_values()),
+        print('<testcase classname="{self.classname}" name="{self.name}" time="{self.time:.3f}">'.format(self=self.escaped_values()),
               file = file)
         if self.failure:
             self.failure.print(file)
