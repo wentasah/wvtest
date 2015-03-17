@@ -146,11 +146,13 @@ class WvLine:
 
 class WvPlainLine(WvLine):
     re = re.compile("(?P<line>.*)")
+
     def __str__(self):
         return self.line
 
 class WvTestingLine(WvLine):
     re = re.compile('(?P<prefix>' + re_prefix + ')Testing "(?P<what>.*)" in (?P<where>.*):$')
+
     def __init__(self, *args):
         if len(args) == 1:
             WvLine.__init__(self, args[0])
@@ -160,6 +162,7 @@ class WvTestingLine(WvLine):
             self.where = args[1]
         else:
             raise TypeError("WvTestingLine.__init__() takes at most 2 positional arguments")
+
     def __str__(self):
         return '{self.prefix}! Testing "{self.what}" in {self.where}:'.format(self=self)
 
@@ -174,6 +177,7 @@ class WvTestingLine(WvLine):
 
 class WvCheckLine(WvLine):
     re = re.compile('(?P<prefix>' + re_prefix + ')!\s*(?P<text>.*?)\s+(?P<result>\S+)$')
+
     def __init__(self, *args):
         if len(args) == 1:
             WvLine.__init__(self, args[0])
@@ -257,7 +261,6 @@ class WvTestLog(list):
         self.log = None
         if logdir and not os.path.isdir(logdir):
             os.mkdir(logdir)
-
 
     def setImplicitTestTitle (self, testing):
         """If the test does not supply its own title as a first line of test
