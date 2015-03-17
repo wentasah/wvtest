@@ -281,13 +281,16 @@ class WvTestLog(list):
             s += e + "\n"
         return s
 
+    def plainText(self):
+        return "\n".join([str(entry) for entry in self]) + "\n"
+
     def _rememberJUnitTestcase(self):
         if not self.junit_xml:
             return
 
         failure = None
         if self.currentTestFailedCount > 0:
-            failure = wvjunit.Failure(text=str(self))
+            failure = wvjunit.Failure(text=self.plainText())
 
         tc = wvjunit.Testcase(classname = self.currentTest.where,
                               name = self.currentTest.what,
