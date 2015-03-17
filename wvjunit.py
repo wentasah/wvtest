@@ -12,7 +12,7 @@ import datetime
 import types
 import inspect
 import sys
-from xml.sax.saxutils import escape
+from xml.sax.saxutils import escape, quoteattr
 
 escEntities = dict([(chr(i), "&#%d;"%i) for i in range(32) if i not in [ord("\t"), ord("\n"), ord("\r")]])
 
@@ -47,7 +47,10 @@ class JUnitBase:
         ret = EscapedObject()
         for attr in self._get_valid_members():
             if type(getattr(self, attr)) not in [float]:
+                # Encode each attribute in two ways - for use in text
+                # nodes and for use in attributes.
                 setattr(ret, attr, escape(str(getattr(self, attr)), escEntities))
+                setattr(ret, attr+"_attr", quoteattr(str(getattr(self, attr)), escEntities))
             else:
                 setattr(ret, attr, getattr(self, attr))
         return ret
@@ -68,7 +71,7 @@ class Failure(JUnitBase):
     text = str
 
     def __str__(self):
-        return '<failure type="{self.type}" message="{self.message}">{self.text}</failure>'.format(self=self.escaped_values())
+        return '<failure type={self.type_attr} message={self.message_attr}>{self.text}</failure>'.format(self=self.escaped_values())
 
 class Testcase(JUnitBase):
     classname = str
@@ -77,7 +80,7 @@ class Testcase(JUnitBase):
     failure = Failure
 
     def print(self, file=sys.stdout):
-        print('<testcase classname="{self.classname}" name="{self.name}" time="{self.time:.3f}">'.format(self=self.escaped_values()),
+        print('<testcase classname={self.classname_attr} name={self.name_attr} time="{self.time:.3f}">'.format(self=self.escaped_values()),
               file = file)
         if self.failure:
             self.failure.print(file)
@@ -99,7 +102,7 @@ class Testsuite(JUnitBase):
     def print(self, file = sys.stdout):
         print('<?xml version="1.1" encoding="UTF-8" ?>', file=file)
         ts = self.timestamp.replace(microsecond=0)
-        print('<testsuite tests="{self.tests}" errors="{self.errors}" failures="{self.failures}" hostname="{self.hostname}" name="{self.name}" time="{self.time}" timestamp="{timestamp}">'.format(self=self.escaped_values(), timestamp=ts.isoformat()),
+        print('<testsuite tests="{self.tests}" errors="{self.errors}" failures="{self.failures}" hostname={self.hostname_attr} name={self.name_attr} time="{self.time}" timestamp="{timestamp}">'.format(self=self.escaped_values(), timestamp=ts.isoformat()),
               file = file)
         print("<properties>", file=file)
         for p in self.properties:
