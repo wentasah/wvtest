@@ -8,7 +8,7 @@ VERSION=$(shell git describe --dirty --always --match='v[0-9]')
 wvtool: wvtool.py FORCE
 	python3 -m py_compile $< # Syntax check
 	python3 $< format sample-ok # Quick functionality check
-	sed -e '/^version = .*/ s//version = "$(VERSION)"/' $< > $@
+	sed -e '/^version = .*/ s//version = "$(VERSION)"/' -e '/# compile-command: "make wvtool"/d' $< > $@
 	chmod +x $@
 
 FORCE:
