@@ -255,11 +255,8 @@ class WvTestLog(list):
 
         self.logdir = logdir
         self.log = None
-        if logdir:
-            try:
-                os.mkdir(logdir)
-            except FileExistsError:
-                pass
+        if logdir and not os.path.isdir(logdir):
+            os.mkdir(logdir)
 
 
     def setImplicitTestTitle (self, testing):
