@@ -3,6 +3,9 @@
 This file is only required when JUnit XML output is enabled with
 --junit-xml switch. Without this switch, wvtool works even when this
 file is not present.
+
+The JUnit XML file created have structure compliant with
+http://windyroad.com.au/dl/Open%20Source/JUnit.xsd.
 """
 
 import datetime
