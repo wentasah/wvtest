@@ -14,7 +14,10 @@ import inspect
 import sys
 from xml.sax.saxutils import escape, quoteattr
 
-escEntities = dict([(chr(i), "&#%d;"%i) for i in range(32) if i not in [ord("\t"), ord("\n"), ord("\r")]])
+escEntities = dict([(chr(i), "&#%d;"%i) for i in range(1, 32) if i not in [ord("\t"), ord("\n"), ord("\r")]])
+
+# Null character is not alowed in XML document. Remove it.
+escEntities['\x00'] = ''
 
 class JUnitBase:
     def _get_valid_members(self):
