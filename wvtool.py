@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2014, 2015 Michal Sojka <sojkam1@fel.cvut.cz>
+# Copyright 2014, 2015, 2017 Michal Sojka <sojkam1@fel.cvut.cz>
 # License: GPLv2+
 
 """Versatile WvTest protocol tool. It replaces wvtestrun script and
@@ -426,11 +426,11 @@ def _run(command, log):
     cmd = command if isinstance(command, str) else ' '.join(command)
     log.setImplicitTestTitle(WvTestingLine("Executing "+cmd, "wvtool"))
 
-    # Popen does not seep to be able to call setpgrp(). Therefore, we
+    # Popen does not seem to be able to call setpgrp(). Therefore, we
     # use start_new_session, but this also create a new session and
     # detaches the process from a terminal. This might be a problem
     # for programs that need a terminal to run.
-    with sp.Popen(command, stdout=sp.PIPE, stderr=sp.STDOUT,
+    with sp.Popen(command, stdin=None, stdout=sp.PIPE, stderr=sp.STDOUT,
                   universal_newlines=False, start_new_session=True) as proc:
         signal.alarm(timeout)
         stdout = io.TextIOWrapper(proc.stdout, errors='replace')
