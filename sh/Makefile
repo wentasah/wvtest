@@ -8,6 +8,7 @@ runtests:
 
 test:
 	../wvtool run t/twvtest.sh
+	WV_BASE_DIR=$(CURDIR) ../wvtool run t/twvtest.sh
 
 clean::
-	rm -f *~ t/*~
+	rm -rf *~ t/*~ test.*
