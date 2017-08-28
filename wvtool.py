@@ -407,9 +407,9 @@ class WvTestLog(list):
     def is_success(self):
         return self.testFailedCount == 0
 
-def _run(command, log):
+def _run(command, log, timeout=100):
     log.show_progress = True
-    timeout = 100
+
 
     def kill_child(sig = None, frame = None):
         os.killpg(proc.pid, sig)
@@ -451,7 +451,7 @@ def _run(command, log):
         log.append(WvCheckLine(text, 'FAILED'))
 
 def do_run(args, log):
-    _run(args.command, log)
+    _run(args.command, log, timeout=args.timeout)
 
 def do_runall(args, log):
     for cmd in args.commands:
@@ -482,6 +482,8 @@ parser.add_argument('-s', '--summary', dest='verbosity', action='store_const',
                     const=WvTestLog.Verbosity.SUMMARY,
                     help='''Hide output of all tests. Print just one line for each "Testing"
                     section and report "ok" or "FAILURE" of it.''')
+parser.add_argument('--timeout', type=int, default=100,
+                    help='Timeout in seconds for any test output (default %(default)s)')
 parser.add_argument('--junit-xml', type=argparse.FileType('w'),
                     help='''Convert output to JUnit compatible XML file''')
 parser.add_argument('--logdir',
