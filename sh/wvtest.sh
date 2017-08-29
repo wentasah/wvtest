@@ -63,7 +63,6 @@ WVPASS()
 		return 0
 	else
 		_wvcheck 1 "$TEXT"
-		# NOTREACHED
 		return 1
 	fi
 }
@@ -76,7 +75,6 @@ WVFAIL()
 	_wvfind_caller
 	if "$@"; then
 		_wvcheck 1 "NOT($TEXT)"
-		# NOTREACHED
 		return 1
 	else
 		_wvcheck 0 "NOT($TEXT)"
