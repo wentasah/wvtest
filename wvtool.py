@@ -461,12 +461,12 @@ def do_format(args, log):
     files = args.infiles
     if len(files) == 0:
         log.setImplicitTestTitle(WvTestingLine("Preamble", "stdin"))
-        for line in sys.stdin:
+        for line in io.TextIOWrapper(sys.stdin.buffer, errors='replace'):
             log.addLine(line)
     else:
         for fn in args.infiles:
             log.setImplicitTestTitle(WvTestingLine("Preamble", fn))
-            for line in open(fn):
+            for line in open(fn, errors='replace'):
                 log.addLine(line)
 
 def do_wrap(args, log):
