@@ -164,7 +164,7 @@ class WvTestingLine(WvLine):
             raise TypeError("WvTestingLine.__init__() takes at most 2 positional arguments")
 
     def __str__(self):
-        return '{self.prefix}! Testing "{self.what}" in {self.where}:'.format(self=self)
+        return '{self.prefix}Testing "{self.what}" in {self.where}:'.format(self=self)
 
     def print(self, file=sys.stdout):
         print(term.attr.bold + str(self) + term.attr.reset, file=file)
