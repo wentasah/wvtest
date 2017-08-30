@@ -341,8 +341,10 @@ class WvTestLog(list):
                 term.set_progress_msg(str(testing.asWvCheckLine(None)))
 
             if self.logdir:
-                self.log = open(os.path.join(self.logdir, "%s-%s.log" %
-                                             (testing.where, testing.what.lower().replace(' ', '_').replace('/', '_'))),
+                self.log = open(os.path.join(self.logdir, "%04d-%s-%s.log" %
+                                             (self.testCount,
+                                              testing.where,
+                                              testing.what.lower().replace(' ', '_').replace('/', '_'))),
                                 'w')
             self.testStartTime = time.time()
         self.currentTest = testing
