@@ -263,8 +263,8 @@ class WvTestLog(list):
             os.mkdir(logdir)
 
     def setImplicitTestTitle (self, testing):
-        """If the test does not supply its own title as a first line of test
-        output, it this title will be used instead."""
+        """If the test does not supply its own title as the first line of test
+        output, this title will be used instead."""
         self.implicitTestTitle = testing
 
     def print(self, file=sys.stdout):
