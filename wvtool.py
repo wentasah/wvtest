@@ -342,7 +342,7 @@ class WvTestLog(list):
 
             if self.logdir:
                 self.log = open(os.path.join(self.logdir, "%s-%s.log" %
-                                             (testing.where, testing.what.lower().replace(' ', '_'))),
+                                             (testing.where, testing.what.lower().replace(' ', '_').replace('/', '_'))),
                                 'w')
             self.testStartTime = time.time()
         self.currentTest = testing
