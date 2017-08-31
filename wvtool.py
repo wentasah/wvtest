@@ -68,16 +68,13 @@ class Term:
     progress_chars = '|/-\\'
 
     def __init__(self):
-        if os.environ['TERM'] == 'dumb':
+        if not 'TERM'  in os.environ or os.environ['TERM'] == 'dumb':
             self.output = None
         else:
             try:
                 self.output = open('/dev/tty', 'w')
             except IOError:
                 self.output = None
-
-        if not self.output:
-            self._clear_colors()
 
         self.width = self._get_width()
         self._enabled = True
@@ -102,7 +99,7 @@ class Term:
         except:
             return int(getattr(os.environ, 'COLUMNS', 80))
 
-    def _clear_colors(self):
+    def clear_colors(self):
         '''Sets all color and attribute memebers to empty strings'''
         for cls in ('attr', 'fg', 'bg'):
             c = getattr(self, cls)
@@ -127,8 +124,6 @@ class Term:
         if self.output:
             self._raw_write(' '*(len(self._progress_msg[:self.width - 3]) + 2) + "\r")
 
-
-term = Term()
 
 class WvLine:
     def __init__(self, match):
@@ -345,7 +340,7 @@ class WvTestLog(list):
                 self.log = open(os.path.join(self.logdir, "%04d-%s-%s.log" %
                                              (self.testCount,
                                               testing.where.translate(trans),
-                                              testing.what.lower().translate(trans)))),
+                                              testing.what.lower().translate(trans))),
                                 'w')
             self.testStartTime = time.time()
         self.currentTest = testing
@@ -477,6 +472,7 @@ def do_wrap(args, log):
 
 parser = argparse.ArgumentParser(description='Versatile wvtest tool')
 
+
 parser.set_defaults(verbosity=WvTestLog.Verbosity.NORMAL)
 parser.add_argument('-v', '--verbose', dest='verbosity', action='store_const',
                     const=WvTestLog.Verbosity.VERBOSE,
@@ -491,6 +487,11 @@ parser.add_argument('--junit-xml', type=argparse.FileType('w'),
                     help='''Convert output to JUnit compatible XML file''')
 parser.add_argument('--logdir',
                     help='''Store test logs in the given directory''')
+parser.add_argument('--color', action='store_true', default=None,
+                    help='Force color output')
+parser.add_argument('--no-color', action='store_false', dest='color',
+                    help='Disable color output')
+
 parser.add_argument('--version', action='version', version='%(prog)s '+version)
 
 subparsers = parser.add_subparsers(help='sub-command help')
@@ -511,6 +512,10 @@ parser_format.add_argument('infiles', nargs='*', help='Files with wvtest output'
 # parser_wrap.set_defaults(func=do_wrap)
 
 args = parser.parse_args()
+term = Term()
+if args.color is None and not term.output or \
+   args.color is False:
+    term.clear_colors()
 
 if not 'func' in args:
     parser.print_help()
