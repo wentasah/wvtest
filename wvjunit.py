@@ -1,11 +1,13 @@
 """Helper file for wvtool to export the results as JUnit compatible XML.
 
-This file is only required when JUnit XML output is enabled with
---junit-xml switch. Without this switch, wvtool works even when this
-file is not present.
+This file is only required when JUnit XML output is to be generated
+with --junit-xml switch. Without this switch, wvtool works even when
+this file is not present.
 
-The JUnit XML file created have structure compliant with
-http://windyroad.com.au/dl/Open%20Source/JUnit.xsd.
+Initially, the created JUnit XML file was structured according to
+http://windyroad.com.au/dl/Open%20Source/JUnit.xsd, but later, a more
+meaningful structure (i.e. <system-out/> unside <testcase/>)
+compatible with Jenkins JUnit plugin was implemented.
 """
 
 import datetime
@@ -80,10 +82,17 @@ class Failure(JUnitBase):
                 '{self.text}'
                 '</failure>'.format(self=self.escaped_values()))
 
+class SystemOut(JUnitBase):
+    text = str
+
+    def __str__(self):
+        return '<system-out>{self.text}</system-out>'.format(self=self.escaped_values())
+
 class Testcase(JUnitBase):
     classname = str
     name = str
     time = float
+    system_out = SystemOut
     failure = Failure
 
     def print(self, file=sys.stdout):
@@ -94,6 +103,8 @@ class Testcase(JUnitBase):
                file = file)
         if self.failure:
             self.failure.print(file)
+        if self.system_out:
+            self.system_out.print(file)
         print("</testcase>", file=file)
 
 class Testsuite(JUnitBase):

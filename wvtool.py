@@ -285,17 +285,25 @@ class WvTestLog(list):
     def plainText(self):
         return "\n".join([str(entry) for entry in self]) + "\n"
 
+    def wvChecks(self):
+        return "\n".join([entry.formated(highlight=False, include_newlines=True)
+                          for entry in self if type(entry) == WvCheckLine]) + "\n"
+
     def _rememberJUnitTestcase(self):
         if not self.junit_xml:
             return
 
-        failure = None
+        system_out = wvjunit.SystemOut(text=self.plainText())
+
         if self.currentTestFailedCount > 0:
-            failure = wvjunit.Failure(text=self.plainText())
+            failure = wvjunit.Failure(text=self.wvChecks())
+        else:
+            failure = None
 
         tc = wvjunit.Testcase(classname = self.currentTest.where,
                               name = self.currentTest.what,
                               time = time.time() - self.testStartTime,
+                              system_out = system_out,
                               failure = failure)
         self.junitTestcases.append(tc)
 
