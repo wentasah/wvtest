@@ -190,19 +190,25 @@ class WvCheckLine(WvLine):
     def is_success(self):
         return self.result == 'ok'
 
-    def formated(self):
-        text = '{self.prefix}! {self.text} '.format(self=self)
-        if self.is_success():
-            color = term.fg.lightgreen
+    def formated(self, highlight = True, include_newlines = False):
+        text = '{self.prefix}! {text} '.format(self=self, text=self.text.rstrip(' .'))
+        if highlight:
+            if self.is_success():
+                color = term.fg.lightgreen
+            else:
+                color = term.fg.lightred
+
+            result = term.attr.bold + color + self.result + term.attr.reset
+            width = term.width
         else:
-            color = term.fg.lightred
-        result = term.attr.bold + color + self.result + term.attr.reset
+            result = self.result
+            width = 80
 
-        lines = math.ceil(len(text) / term.width)
-        if len(text) % term.width > term.width - 10:
-            lines += 1
-
-        text = format(text, '.<' + str(lines * term.width - 10))
+        lines = math.ceil((len(text) + 10) / width)
+        text = format(text, '.<' + str(lines * width - 10))
+        if include_newlines:
+            for i in reversed(range(width, width*lines, width)):
+                text = text[:i] + '\n' + text[i:]
         return '{text} {result}'.format(text=text, result=result)
 
     def print(self, file=sys.stdout):
