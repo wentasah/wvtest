@@ -190,7 +190,7 @@ class WvCheckLine(WvLine):
     def is_success(self):
         return self.result == 'ok'
 
-    def formated(self, highlight = True, include_newlines = False):
+    def formated(self, highlight=True, include_newlines=False, result_space=10):
         text = '{self.prefix}! {text} '.format(self=self, text=self.text.rstrip(' .'))
         if highlight:
             if self.is_success():
@@ -204,8 +204,8 @@ class WvCheckLine(WvLine):
             result = self.result
             width = 80
 
-        lines = math.ceil((len(text) + 10) / width)
-        text = format(text, '.<' + str(lines * width - 10))
+        lines = math.ceil((len(text) + result_space) / width)
+        text = format(text, '.<' + str(lines * width - result_space))
         if include_newlines:
             for i in reversed(range(width, width*lines, width)):
                 text = text[:i] + '\n' + text[i:]
@@ -285,10 +285,6 @@ class WvTestLog(list):
     def plainText(self):
         return "\n".join([str(entry) for entry in self]) + "\n"
 
-    def wvChecks(self):
-        return "\n".join([entry.formated(highlight=False, include_newlines=True)
-                          for entry in self if type(entry) == WvCheckLine]) + "\n"
-
     def _rememberJUnitTestcase(self):
         if not self.junit_xml:
             return
@@ -296,7 +292,11 @@ class WvTestLog(list):
         system_out = wvjunit.SystemOut(text=self.plainText())
 
         if self.currentTestFailedCount > 0:
-            failure = wvjunit.Failure(text=self.wvChecks())
+            wvchecks = "\n".join(
+                [entry.formated(highlight=False, include_newlines=True, result_space=0)
+                 for entry in self if type(entry) == WvCheckLine]
+            ) + "\n"
+            failure = wvjunit.Failure(text=wvchecks)
         else:
             failure = None
 
