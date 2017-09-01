@@ -74,7 +74,11 @@ class Failure(JUnitBase):
     text = str
 
     def __str__(self):
-        return '<failure type={self.type_attr} message={self.message_attr}>{self.text}</failure>'.format(self=self.escaped_values())
+        return ('<failure'
+                ' type={self.type_attr}'
+                ' message={self.message_attr}>'
+                '{self.text}'
+                '</failure>'.format(self=self.escaped_values()))
 
 class Testcase(JUnitBase):
     classname = str
@@ -83,8 +87,11 @@ class Testcase(JUnitBase):
     failure = Failure
 
     def print(self, file=sys.stdout):
-        print('<testcase classname={self.classname_attr} name={self.name_attr} time="{self.time:.3f}">'.format(self=self.escaped_values()),
-              file = file)
+        print(('<testcase'
+               ' classname={self.classname_attr}'
+               ' name={self.name_attr}'
+               ' time="{self.time:.3f}">').format(self=self.escaped_values()),
+               file = file)
         if self.failure:
             self.failure.print(file)
         print("</testcase>", file=file)
