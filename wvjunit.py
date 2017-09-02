@@ -61,7 +61,8 @@ class JUnitBase:
         return ret
 
     def print(self, file=sys.stdout):
-        print(str(self), file=file)
+        if str(self):
+            print(str(self), file=file)
 
 class Property(JUnitBase):
     name = str
@@ -86,7 +87,10 @@ class SystemOut(JUnitBase):
     text = str
 
     def __str__(self):
-        return '<system-out>{self.text}</system-out>'.format(self=self.escaped_values())
+        if self.text:
+            return '<system-out>{self.text}</system-out>'.format(self=self.escaped_values())
+        else:
+            return ''
 
 class Testcase(JUnitBase):
     classname = str
@@ -117,13 +121,12 @@ class Testsuite(JUnitBase):
     timestamp = datetime.datetime
     properties = list
     testcases = list
-    system_out = str
+    system_out = SystemOut
     system_err = str
 
     def print(self, file = sys.stdout):
-        print('<?xml version="1.1" encoding="UTF-8" ?>', file=file)
         ts = self.timestamp.replace(microsecond=0)
-        print('<testsuite tests="{self.tests}" errors="{self.errors}" failures="{self.failures}" hostname={self.hostname_attr} name={self.name_attr} time="{self.time}" timestamp="{timestamp}">'.format(self=self.escaped_values(), timestamp=ts.isoformat()),
+        print('<testsuite tests="{self.tests}" errors="{self.errors}" failures="{self.failures}" hostname={self.hostname_attr} name={self.name_attr} time="{self.time:.3f}" timestamp="{timestamp}">'.format(self=self.escaped_values(), timestamp=ts.isoformat()),
               file = file)
         print("<properties>", file=file)
         for p in self.properties:
@@ -131,4 +134,15 @@ class Testsuite(JUnitBase):
         print("</properties>", file=file)
         for t in self.testcases:
             t.print(file=file)
-        print("<system-out></system-out>\n<system-err></system-err>\n</testsuite>", file=file)
+        self.system_out.print(file=file)
+        print("</testsuite>", file=file)
+
+class Testsuites(JUnitBase):
+    testsuites = list
+
+    def print(self, file = sys.stdout):
+        print('<?xml version="1.1" encoding="UTF-8" ?>', file=file)
+        print('<testsuites>', file = file)
+        for t in self.testsuites:
+            t.print(file=file)
+        print("</testsuites>", file=file)

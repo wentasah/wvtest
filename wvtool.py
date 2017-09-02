@@ -14,7 +14,7 @@ provides some other useful features. Namely:
 Newest version can be found at https://github.com/wentasah/wvtest.
 """
 
-version = "git" # This get repaced by make
+version = "git"  # This gets repaced by make
 
 import argparse
 import subprocess as sp
@@ -26,6 +26,7 @@ import math
 import io
 import datetime
 import time
+import socket
 
 # Regulr expression that matches potential prefixes to wvtest protocol lines
 re_prefix = ''
@@ -178,7 +179,7 @@ class WvCheckLine(WvLine):
             WvLine.__init__(self, args[0])
         elif len(args) == 2:
             self.prefix = ''
-            self.text = args[0]
+            self.text = args[0].rstrip(' .')
             self.result = args[1]
         else:
             raise TypeError("WvCheckLine.__init__() takes at most 2 positional arguments")
@@ -191,7 +192,7 @@ class WvCheckLine(WvLine):
         return self.result == 'ok'
 
     def formated(self, highlight=True, include_newlines=False, result_space=10):
-        text = '{self.prefix}! {text} '.format(self=self, text=self.text.rstrip(' .'))
+        text = '{self.prefix}! {self.text} '.format(self=self)
         if highlight:
             if self.is_success():
                 color = term.fg.lightgreen
@@ -222,7 +223,7 @@ class WvCheckLine(WvLine):
 class WvTagLine(WvLine):
     re  = re.compile('(?P<prefix>' + re_prefix + ')wvtest:\s*(?P<tag>.*)$')
 
-class WvTestLog(list):
+class WvTestProcessor(list):
 
     class Verbosity:
         # Print one line for each "Testing" section. Passed tests are
@@ -237,7 +238,10 @@ class WvTestLog(list):
         # reformat/syntax-highlight known lines.
         VERBOSE = 3
 
-    def __init__(self, verbosity = Verbosity.NORMAL, junit_xml : io.IOBase = None,
+    def __init__(self,
+                 verbosity = Verbosity.NORMAL,
+                 junit_xml: io.IOBase = None,
+                 junit_prefix: str = '',
                  logdir = None):
         self.checkCount = 0
         self.checkFailedCount = 0
@@ -246,17 +250,18 @@ class WvTestLog(list):
 
         self.implicitTestTitle = None
         self.currentTest = None
-        self.currentTestFailedCount = 0
 
         self.verbosity = verbosity
         self.show_progress = False
 
         self.junit_xml = junit_xml
+        self.junit_prefix = junit_prefix
 
         if junit_xml:
             global wvjunit
             import wvjunit
             self.junitTestcases = []
+            self.junitTestsuites = []
 
         self.logdir = logdir
         self.log = None
@@ -285,44 +290,60 @@ class WvTestLog(list):
     def plainText(self):
         return "\n".join([str(entry) for entry in self]) + "\n"
 
-    def _rememberJUnitTestcase(self):
+    def _rememberJUnitTestcase(self, check: WvCheckLine):
+        if not self.junit_xml:
+            return
+
+        t = time.time()
+        duration = t - (self.lastCheckTime or self.testStartTime)
+        self.lastCheckTime = t
+
+        if not check.is_success():
+            failure = wvjunit.Failure(type='WvTest check',
+                                      message=check.text)
+        else:
+            failure = None
+
+        self.junitTestcases.append(
+            wvjunit.Testcase(
+                classname="{}{}.{}".format(
+                    self.junit_prefix,
+                    self.currentTest.where.replace('.', '_'),
+                    self.currentTest.what),
+                name=check.text,
+                time=duration,
+                failure=failure))
+
+    def _rememberJUnitTestsuite(self):
         if not self.junit_xml:
             return
 
         system_out = wvjunit.SystemOut(text=self.plainText())
 
-        if self.currentTestFailedCount > 0:
-            wvchecks = "\n".join(
-                [entry.formated(highlight=False, include_newlines=True, result_space=0)
-                 for entry in self if type(entry) == WvCheckLine]
-            ) + "\n"
-            failure = wvjunit.Failure(text=wvchecks)
-        else:
-            failure = None
-
-        tc = wvjunit.Testcase(classname = self.currentTest.where,
-                              name = self.currentTest.what,
-                              time = time.time() - self.testStartTime,
-                              system_out = system_out,
-                              failure = failure)
-        self.junitTestcases.append(tc)
+        ts = wvjunit.Testsuite(tests=self.checkCount,
+                               failures=self.checkFailedCount,
+                               errors=0,
+                               name="{}{}.{}".format(
+                                   self.junit_prefix,
+                                   self.currentTest.where.replace('.', '_'),
+                                   self.currentTest.what),
+                               time=time.time()-self.testStartTime,
+                               hostname=socket.getfqdn(),
+                               timestamp=datetime.datetime.now(),
+                               testcases=self.junitTestcases,
+                               system_out=system_out)
+        self.junitTestsuites.append(ts)
+        self.junitTestcases = []
 
     def _generateJUnitXML(self):
         if not self.junit_xml:
             return
-        ts = wvjunit.Testsuite(tests = self.testCount,
-                               failures = self.testFailedCount,
-                               errors = 0,
-                               name = 'N/A',
-                               time = 0,
-                               hostname="localhost",
-                               timestamp = datetime.datetime.now(),
-                               testcases = self.junitTestcases)
-        ts.print(file = self.junit_xml)
+        tss = wvjunit.Testsuites(testsuites=self.junitTestsuites)
+        tss.print(file=self.junit_xml)
 
     def _finishCurrentTest(self):
-        self._rememberJUnitTestcase()
-        if self.currentTestFailedCount > 0:
+        self._rememberJUnitTestsuite()
+        if self.checkFailedCount > 0:
             if self.show_progress and self.verbosity < self.Verbosity.VERBOSE:
                 term.clear_progress_msg()
             if self.verbosity == self.Verbosity.NORMAL:
@@ -357,16 +378,18 @@ class WvTestLog(list):
                                               testing.what.lower().translate(trans))),
                                 'w')
             self.testStartTime = time.time()
+            self.lastCheckTime = None
         self.currentTest = testing
-        self.currentTestFailedCount = 0
+        self.checkCount = 0
+        self.checkFailedCount = 0
 
-    def _newCheck(self, check : WvCheckLine):
+    def _newCheck(self, check: WvCheckLine):
         self.checkCount += 1
         if not check.is_success():
             self.checkFailedCount += 1
-            self.currentTestFailedCount += 1
+        self._rememberJUnitTestcase(check)
 
-    def append(self, logEntry : WvLine):
+    def append(self, logEntry: WvLine):
         if self.implicitTestTitle:
             if str(logEntry) == '':
                 pass
@@ -394,7 +417,7 @@ class WvTestLog(list):
         if self.log:
             logEntry.log(self.log)
 
-    def addLine(self, line):
+    def processLine(self, line):
         line = line.rstrip()
         logEntry = None
 
@@ -419,8 +442,8 @@ class WvTestLog(list):
     def is_success(self):
         return self.testFailedCount == 0
 
-def _run(command, log, timeout=100):
-    log.show_progress = True
+def _run(command, processor, timeout=100):
+    processor.show_progress = True
 
 
     def kill_child(sig = None, frame = None):
@@ -428,7 +451,7 @@ def _run(command, log, timeout=100):
 
     def alarm(sig = None, frame = None):
         msg = "! {wvtool}: Alarm timed out!  No test output for {timeout} seconds.  FAILED"
-        log.addLine(msg.format(wvtool=sys.argv[0], timeout=timeout))
+        processor.processLine(msg.format(wvtool=sys.argv[0], timeout=timeout))
         kill_child(signal.SIGTERM)
 
     signal.signal(signal.SIGINT, kill_child)
@@ -436,7 +459,7 @@ def _run(command, log, timeout=100):
     signal.signal(signal.SIGALRM, alarm)
 
     cmd = command if isinstance(command, str) else ' '.join(command)
-    log.setImplicitTestTitle(WvTestingLine("Executing "+cmd, "wvtool"))
+    processor.setImplicitTestTitle(WvTestingLine("Preamble of "+cmd, "wvtool"))
 
     # Popen does not seem to be able to call setpgrp(). Therefore, we
     # use start_new_session, but this also create a new session and
@@ -448,7 +471,7 @@ def _run(command, log, timeout=100):
         stdout = io.TextIOWrapper(proc.stdout, errors='replace')
         for line in stdout:
             signal.alarm(timeout)
-            log.addLine(line)
+            processor.processLine(line)
 
     signal.alarm(0)
 
@@ -460,46 +483,49 @@ def _run(command, log, timeout=100):
 
         text = msg.format(wvtool=sys.argv[0], cmd=cmd,
                           ec=proc.returncode, sig=-proc.returncode)
-        log.append(WvCheckLine(text, 'FAILED'))
+        processor.append(WvCheckLine(text, 'FAILED'))
 
-def do_run(args, log):
-    _run(args.command, log, timeout=args.timeout)
+def do_run(args, processor):
+    _run(args.command, processor, timeout=args.timeout)
 
-def do_runall(args, log):
+def do_runall(args, processor):
     for cmd in args.commands:
-        _run(cmd, log)
+        _run(cmd, processor)
 
-def do_format(args, log):
+def do_format(args, processor):
     files = args.infiles
     if len(files) == 0:
-        log.setImplicitTestTitle(WvTestingLine("Preamble", "stdin"))
+        processor.setImplicitTestTitle(WvTestingLine("Preamble", "stdin"))
         for line in io.TextIOWrapper(sys.stdin.buffer, errors='replace'):
-            log.addLine(line)
+            processor.processLine(line)
     else:
         for fn in args.infiles:
-            log.setImplicitTestTitle(WvTestingLine("Preamble", fn))
+            processor.setImplicitTestTitle(WvTestingLine("Preamble", fn))
             for line in open(fn, errors='replace'):
-                log.addLine(line)
+                processor.processLine(line)
 
-def do_wrap(args, log):
+def do_wrap(args, processor):
     pass
 
 parser = argparse.ArgumentParser(description='Versatile wvtest tool')
 
 
-parser.set_defaults(verbosity=WvTestLog.Verbosity.NORMAL)
+parser.set_defaults(verbosity=WvTestProcessor.Verbosity.NORMAL)
 parser.add_argument('-v', '--verbose', dest='verbosity', action='store_const',
-                    const=WvTestLog.Verbosity.VERBOSE,
+                    const=WvTestProcessor.Verbosity.VERBOSE,
                     help='Do not hide output of successful tests')
 parser.add_argument('-s', '--summary', dest='verbosity', action='store_const',
-                    const=WvTestLog.Verbosity.SUMMARY,
+                    const=WvTestProcessor.Verbosity.SUMMARY,
                     help='''Hide output of all tests. Print just one line for each "Testing"
                     section and report "ok" or "FAILURE" of it.''')
-parser.add_argument('--timeout', type=int, default=100,
+parser.add_argument('--timeout', type=int, default=100, metavar='SEC',
                     help='Timeout in seconds for any test output (default %(default)s)')
-parser.add_argument('--junit-xml', type=argparse.FileType('w'),
+parser.add_argument('--junit-xml', type=argparse.FileType('w'), metavar='FILE',
                     help='''Convert output to JUnit compatible XML file''')
-parser.add_argument('--logdir',
+parser.add_argument('--junit-prefix', metavar='STR',
+                    help='''Prefix to prepend to generated class names (useful when a test is
+                    run multiple times in different environments)''')
+parser.add_argument('--logdir', metavar='DIR',
                     help='''Store test logs in the given directory''')
 parser.add_argument('--color', action='store_true', default=None,
                     help='Force color output')
@@ -535,10 +561,14 @@ if not 'func' in args:
     parser.print_help()
     sys.exit(1)
 
-log = WvTestLog(args.verbosity, junit_xml = args.junit_xml, logdir=args.logdir)
-args.func(args, log)
-log.done()
-sys.exit(0 if log.is_success() else 1)
+processor = WvTestProcessor(
+    args.verbosity,
+    junit_xml = args.junit_xml,
+    junit_prefix = args.junit_prefix,
+    logdir=args.logdir)
+args.func(args, processor)
+processor.done()
+sys.exit(0 if processor.is_success() else 1)
 
 # Local Variables:
 # compile-command: "make wvtool"
