@@ -7,6 +7,7 @@
 provides some other useful features. Namely:
 - Summary mode (--summary)
 - Test results aligned to the same column
+- (Experimental) Export to JUnit XML
 - TODO: Conversion to HTML
 - TODO: Variable timeout
 - TODO: Checking of expected number of tests
