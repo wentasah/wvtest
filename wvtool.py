@@ -97,7 +97,10 @@ class Term:
             import fcntl, termios, struct, os
             s = struct.pack('HHHH', 0, 0, 0, 0)
             x = fcntl.ioctl(self.output.fileno(), termios.TIOCGWINSZ, s)
-            return struct.unpack('HHHH', x)[1]
+            width = struct.unpack('HHHH', x)[1]
+            if width <= 0:
+                raise Exception
+            return width
         except:
             return int(getattr(os.environ, 'COLUMNS', 80))
 
