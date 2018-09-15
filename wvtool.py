@@ -69,7 +69,7 @@ class Term:
 
     progress_chars = '|/-\\'
 
-    def __init__(self):
+    def __init__(self, width=None):
         if not 'TERM'  in os.environ or os.environ['TERM'] == 'dumb':
             self.output = None
         else:
@@ -78,7 +78,7 @@ class Term:
             except IOError:
                 self.output = None
 
-        self.width = self._get_width()
+        self.width = width or self._get_width()
         self._enabled = True
         self._progress_msg = ''
         self._progress_idx = 0
@@ -522,6 +522,8 @@ parser.add_argument('-s', '--summary', dest='verbosity', action='store_const',
                     const=WvTestProcessor.Verbosity.SUMMARY,
                     help='''Hide output of all tests. Print just one line for each "Testing"
                     section and report "ok" or "FAILURE" of it.''')
+parser.add_argument('-w', '--width', type=int,
+                    help='Override terminal width or COLUMNS environment wariable.')
 parser.add_argument('--timeout', type=int, default=100, metavar='SEC',
                     help='Timeout in seconds for any test output (default %(default)s)')
 parser.add_argument('--junit-xml', type=argparse.FileType('w'), metavar='FILE',
@@ -556,7 +558,7 @@ parser_format.add_argument('infiles', nargs='*', help='Files with wvtest output'
 # parser_wrap.set_defaults(func=do_wrap)
 
 args = parser.parse_args()
-term = Term()
+term = Term(args.width)
 if args.color is None and not term.output or \
    args.color is False:
     term.clear_colors()
